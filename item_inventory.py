@@ -20,6 +20,26 @@ import sqlite3
 import os
 from threading import Thread
 from queue import Queue
+import sys
+from IPython.display import clear_output
+
+
+def update_progress(progress):
+    bar_length = 20
+    if isinstance(progress, int):
+        progress = float(progress)
+    if not isinstance(progress, float):
+        progress = 0
+    if progress < 0:
+        progress = 0
+    if progress >= 1:
+        progress = 1
+
+    block = int(round(bar_length * progress))
+
+    clear_output(wait = True)
+    text = "Progress: [{0}] {1:.1f}%".format( "#" * block + "-" * (bar_length - block), progress * 100)
+    print(text)
 
 
 def map_layer_editable(op_lyr):
@@ -316,7 +336,144 @@ def user_scan(gis_object, dict_lists, num_threads):
     q.join()   
     return folder_dict
     
-    
+
+def output_to_sqlite(dict_lists, sqlite_path):
+    sql_views = [
+        """CREATE VIEW APPS_TO_MAPS AS
+        SELECT *
+          FROM WEB_APPS WA
+               LEFT JOIN
+               WEB_MAPS WM ON WA.WEBMAP_ID = WM.ITEM_ID;"""
+        ,
+        """CREATE VIEW BROKEN_LAYERS AS
+        SELECT REL.WEBMAP_TITLE,
+               REL.LAYER_NAME,
+               FS.ITEM_NAME AS FS_NAME,
+               WM.SHARED AS WM_SHARED,
+               FS.SHARED AS FS_SHARED
+          FROM MAP_FS_REL REL
+               LEFT JOIN
+               WEB_MAPS WM ON REL.WEBMAP_ID = WM.ITEM_ID
+               LEFT JOIN
+               FEATURE_SERVICES FS ON REL.LAYER_ITEM_ID = FS.ITEM_ID
+         WHERE WM.SHARED <> FS.SHARED AND 
+               FS.SHARED = 'Private';"""
+        ,
+        """CREATE VIEW ALL_ITEMS AS
+        SELECT ITEM_TYPE,
+               ITEM_NAME,
+               FOLDER,
+               SHARED,
+               EVERYONE,
+               ORG,
+               GROUPS,
+               OWNER,
+               CREATEDATE,
+               MODATE,
+               ITEM_ID,
+               SIZE,
+               CONTENT_STATUS
+          FROM FEATURE_SERVICES
+        UNION ALL
+        SELECT ITEM_TYPE,
+               ITEM_NAME,
+               FOLDER,
+               SHARED,
+               EVERYONE,
+               ORG,
+               GROUPS,
+               OWNER,
+               CREATEDATE,
+               MODATE,
+               ITEM_ID,
+               SIZE,
+               CONTENT_STATUS
+          FROM WEB_MAPS
+        UNION ALL
+        SELECT ITEM_TYPE,
+               ITEM_NAME,
+               FOLDER,
+               SHARED,
+               EVERYONE,
+               ORG,
+               GROUPS,
+               OWNER,
+               CREATEDATE,
+               MODATE,
+               ITEM_ID,
+               SIZE,
+               CONTENT_STATUS
+          FROM WEB_APPS
+        UNION ALL
+        SELECT ITEM_TYPE,
+               ITEM_NAME,
+               FOLDER,
+               SHARED,
+               EVERYONE,
+               ORG,
+               GROUPS,
+               OWNER,
+               CREATEDATE,
+               MODATE,
+               ITEM_ID,
+               SIZE,
+               CONTENT_STATUS
+          FROM OTHER_ITEMS;
+    """
+        ,
+        """CREATE VIEW SHARED_EVERYONE AS
+        SELECT *
+          FROM ALL_ITEMS
+         WHERE EVERYONE = 1
+         ORDER BY OWNER;"""
+        ,
+        """CREATE VIEW GROUPS_ZEROMEMBERS AS
+        SELECT *
+          FROM GROUPS
+         WHERE MEMBERCOUNT = 0;"""
+        ,
+        """CREATE VIEW USERS_NEVERLOGIN AS
+        SELECT *
+          FROM USERS
+         WHERE LAST_LOGIN = -1;"""
+        ,
+        """CREATE VIEW USERS_VIEW AS
+        SELECT USERNAME,
+               FIRSTNAME,
+               LASTNAME,
+               LEVEL,
+               ROLE,
+               CREATED,
+               LAST_LOGIN,
+               ROUND(JULIANDAY({}, 'unixepoch','localtime') - JULIANDAY(LAST_LOGIN),-2) AS DAYS_STAGNANT,
+               DESCRIPTION
+          FROM USERS;""".format(time.time())
+        ,
+        """CREATE VIEW OTO_FS_MAP AS
+        SELECT LAYER_ITEM_ID,
+               WEBMAP_ID
+          FROM MAP_FS_REL
+         GROUP BY LAYER_ITEM_ID,
+                  WEBMAP_ID;"""
+        ,
+        """CREATE VIEW SHARING_GROUPS AS
+        SELECT
+          ITEM_ID,
+        COUNT(*) AS GROUP_COUNT,
+        GROUP_CONCAT(GROUP_NAME) AS GROUPS
+         FROM SHARING
+         GROUP BY ITEM_ID"""
+        ]
+
+    conn = sqlite3.connect(sqlite_path)
+    for key in dict_lists:
+        dlist_to_sqlite(dict_lists[key], conn, key)
+
+    cursor = sqlite3.Cursor(conn)
+    for statement in sql_views:
+        cursor.execute(statement)
+    conn.close()
+
 
 # print_message('Starting Group Scan...')
 # groups = GIS.groups.search()
