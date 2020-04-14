@@ -71,7 +71,7 @@ def dlist_to_sqlite(dlist, connection, table_name, **kwargs):
     connection.commit()
 
     
-def item_grab(queue, dict_lists):
+def item_grab(queue, dict_lists, folder_dict):
     # common attributes
     while not queue.empty():
         work = queue.get()
@@ -188,7 +188,7 @@ def item_grab(queue, dict_lists):
     return True
 
 
-def item_scan(gis_object, dict_lists, num_threads, justme=False):
+def item_scan(gis_object, dict_lists, folder_dict, num_threads, justme=False):
     try:
         if justme:
             item_list = gis_object.content.advanced_search('owner:{}'.format(username), max_items=9999)['results']
@@ -210,7 +210,7 @@ def item_scan(gis_object, dict_lists, num_threads, justme=False):
         num_threads = len(item_list)
 
     for i in range(num_threads):
-        worker = Thread(target=item_grab, args=(q, dict_lists))
+        worker = Thread(target=item_grab, args=(q, dict_lists, folder_dict))
         worker.setDaemon(True)
         worker.start()
 
@@ -276,8 +276,9 @@ def group_grab(queue, dict_lists):
     
 def group_scan(gis_object, dict_lists, num_threads):
     groups = gis_object.groups.search()
+    groupids = [group.id for group in groups]
     for group in gis_object.users.me.groups:
-        if group not in groups:
+        if group.id not in groupids:
             groups.append(group)
     
     q = Queue(maxsize=0)
