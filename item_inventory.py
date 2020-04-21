@@ -1,5 +1,5 @@
 
-
+# TODO - add functionality for group content.  grab group_content from each group and add unique values to all items.
 
 import arcgis
 # import arcpy
@@ -100,8 +100,12 @@ def item_grab(queue, dict_lists, folder_dict):
                 # add to list of feature services
                 if 'View Service' in item_desc.typeKeywords:
                     is_view = True
-                    source_item_id = item_desc.related_items('Service2Service', 'reverse')[0].id
-                    source_item_name = item_desc.related_items('Service2Service', 'reverse')[0].title
+                    try:
+                        source_item_id = item_desc.related_items('Service2Service', 'reverse')[0].id
+                        source_item_name = item_desc.related_items('Service2Service', 'reverse')[0].title
+                    except:
+                        source_item_id = None
+                        source_item_name = None
                 else:
                     is_view = False
                     source_item_id = None
@@ -148,8 +152,9 @@ def item_grab(queue, dict_lists, folder_dict):
                         [name, itemid, layername, False, None, None, layerurl])
 
             elif item_desc.type == 'Web Mapping Application':
-                appdata = item_desc.get_data()
+                
                 try:
+                    appdata = item_desc.get_data()
                     apptoMapID = appdata['map']['itemId']
                 except:
                     apptoMapID = None
@@ -181,6 +186,11 @@ def item_scan(gis_object, dict_lists, folder_dict, num_threads, justme=False):
             item_list = gis_object.content.search('owner:{}'.format(gis_object.users.me.username), max_items=9999)
         else:
             item_list = gis_object.content.search('*', max_items = 9999)
+            
+    itemids = [item.id for item in item_list]
+    for itemid in dict_lists['temp_shared_items']:
+        if itemid not in itemids:
+            item_list.append(dict_lists['temp_shared_items'][itemid])
     
     q = Queue(maxsize=0)
 
@@ -197,6 +207,7 @@ def item_scan(gis_object, dict_lists, folder_dict, num_threads, justme=False):
 
     q.join()
     
+    dict_lists.pop('temp_shared_items',None)
     
 def set_up_dict_lists():
     return {
@@ -225,7 +236,8 @@ def set_up_dict_lists():
         'CATEGORIES': [
             ['ITEM_ID', 'CATEGORY']],
         'TAGS': [
-            ['ITEM_ID', 'TAG']]
+            ['ITEM_ID', 'TAG']],
+        'temp_shared_items' : {}
             }
 
 
@@ -247,6 +259,7 @@ def group_grab(queue, dict_lists):
         content = group.content()
         for item in content:
             dict_lists['SHARING'].append([item.id, group.title])
+            dict_lists['temp_shared_items'][item.id] = item
         for user in users:
             # add user to groupmember list
             dict_lists['GROUP_MEMBERSHIP'].append([title, user, 'USER'])
