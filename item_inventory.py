@@ -305,8 +305,11 @@ def user_grab(queue, dict_lists, folder_dict):
         description = user.description
         last_login = online_to_pst_time(user.lastLogin)
         dict_lists['USERS'].append([username, firstname, lastname, level, roleID, created, last_login, description])
-        for folder in user.folders:
-            folder_dict[folder['id']] = folder['title']
+        try:
+            for folder in user.folders:
+                folder_dict[folder['id']] = folder['title']
+        except:
+            pass
         queue.task_done()
     return True
 

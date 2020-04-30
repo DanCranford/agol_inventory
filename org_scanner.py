@@ -14,6 +14,7 @@ from item_inventory import *
 url = input('ArcGIS Org URL: ')
 username = input('Username: ')
 session_gis = arcgis.GIS(url, username)
+just_me = False
 
 
 # In[ ]:
@@ -38,7 +39,7 @@ folder_dict = user_scan(session_gis, inventory_dict, 15)
 
 
 print('Scanning Items...')
-item_scan(session_gis, inventory_dict, folder_dict, 15)
+item_scan(session_gis, inventory_dict, folder_dict, 15, just_me)
 
 
 # In[ ]:
