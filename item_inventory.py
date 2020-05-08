@@ -1,5 +1,4 @@
 
-# TODO - add functionality for group content.  grab group_content from each group and add unique values to all items.
 
 import arcgis
 # import arcpy
@@ -156,9 +155,10 @@ def item_grab(queue, dict_lists, folder_dict):
                 try:
                     appdata = item_desc.get_data()
                     apptoMapID = appdata['map']['itemId']
+                    del (appdata)
                 except:
                     apptoMapID = None
-                del (appdata)
+
                 dict_lists['WEB_APPS'].append(
                     [item_desc.type, name, folder_desc, shared, everyone, org, groups, owner_desc, created, modified,
                      itemid, apptoMapID, size, content_status])
@@ -462,47 +462,52 @@ def output_to_sqlite(dict_lists, sqlite_path):
          FROM SHARING
          GROUP BY ITEM_ID"""
          ,
-    """CREATE VIEW STORAGE_ESTIMATE AS 
-            SELECT
-            CATEGORY,
-            ITEMS,
-            PRINTF("%.2f", MB) AS MB,
-            FS_COUNT,
-            PRINTF("%.2f", FS_MB) AS FS_MB,
-            PRINTF("%.2f", FS_CPM) AS FS_CPM,
-            OTHER_COUNT,
-            PRINTF("%.2f", OTHER_MB) AS OTHER_MB,
-            PRINTF("%.2f", OTHER_CPM) AS OTHER_CPM,
-            PRINTF("%.2f", TOTAL_CPM) AS TOTAL_CPM
-        
-        FROM
-        
-        (SELECT
-            REPLACE(CATEGORIES, '/Categories/','') AS CATEGORY,
-            COUNT(*) AS ITEMS,
-            SUM(SIZE)/1024/1024 AS MB,
-            SUM(CASE WHEN ITEM_TYPE = 'Feature Service' THEN 1 ELSE 0 END) AS FS_COUNT,
-            SUM(CASE WHEN ITEM_TYPE = 'Feature Service' THEN SIZE/1024.0/1024.0 ELSE 0 END) AS FS_MB,
-            SUM(CASE WHEN ITEM_TYPE = 'Feature Service' THEN SIZE/1024.0/1024.0*.25 ELSE 0 END) AS FS_CPM,
-            SUM(CASE WHEN ITEM_TYPE <> 'Feature Service' THEN 1 ELSE 0 END) AS OTHER_COUNT,
-            SUM(CASE WHEN ITEM_TYPE <> 'Feature Service' THEN SIZE/1024.0/1024.0 ELSE 0 END) AS OTHER_MB,
-            SUM(CASE WHEN ITEM_TYPE <> 'Feature Service' THEN SIZE/1024.0/1024.0/1024.0*1.2 ELSE 0 END) AS OTHER_CPM,
-                SUM(CASE WHEN ITEM_TYPE <> 'Feature Service' THEN SIZE/1024.0/1024.0/1024.0*1.2 ELSE 0 END) +
-                SUM(CASE WHEN ITEM_TYPE = 'Feature Service' THEN SIZE/1024.0/1024.0*.25 ELSE 0 END)
-            AS TOTAL_CPM
-            
-        FROM
-            ALL_ITEMS AI
-        LEFT JOIN
-            (SELECT
-            ITEM_ID,
-            GROUP_CONCAT(CATEGORY) AS CATEGORIES,
-            COUNT(*) AS TOTALCATS
-            FROM CATEGORIES
-            GROUP BY ITEM_ID) CATS
-        ON AI.ITEM_ID = CATS.ITEM_ID
-        GROUP BY REPLACE(CATEGORIES, '/Categories/','') 
-        )""",
+    """
+SELECT
+    CATEGORY,
+    ITEMS,
+    PRINTF("%.2f", MB) AS MB,
+    FS_COUNT,
+    PRINTF("%.2f", FS_MB) AS FS_MB,
+    PRINTF("%.2f", FS_CPM) AS FS_CPM,
+    OTHER_COUNT,
+    PRINTF("%.2f", OTHER_MB) AS OTHER_MB,
+    PRINTF("%.2f", OTHER_CPM) AS OTHER_CPM,
+    PRINTF("%.2f", TOTAL_CPM) AS TOTAL_CPM
+
+FROM
+
+(SELECT
+    REPLACE(CATEGORIES, '/Categories/','') AS CATEGORY,
+    COUNT(*) AS ITEMS,
+    SUM(SIZE)/1024/1024 AS MB,
+    SUM(CASE WHEN ITEM_TYPE = 'Feature Service' THEN 1 ELSE 0 END) AS FS_COUNT,
+    SUM(CASE WHEN ITEM_TYPE = 'Feature Service' THEN SIZE/1024.0/1024.0 ELSE 0 END) AS FS_MB,
+    SUM(CASE WHEN ITEM_TYPE = 'Feature Service' THEN SIZE/1024.0/1024.0*.25 ELSE 0 END) AS FS_CPM,
+    SUM(CASE WHEN ITEM_TYPE <> 'Feature Service' THEN 1 ELSE 0 END) AS OTHER_COUNT,
+    SUM(CASE WHEN ITEM_TYPE <> 'Feature Service' THEN SIZE/1024.0/1024.0 ELSE 0 END) AS OTHER_MB,
+    SUM(CASE WHEN ITEM_TYPE <> 'Feature Service' THEN SIZE/1024.0/1024.0/1024.0*1.2 ELSE 0 END) AS OTHER_CPM,
+        SUM(CASE WHEN ITEM_TYPE <> 'Feature Service' THEN SIZE/1024.0/1024.0/1024.0*1.2 ELSE 0 END) +
+        SUM(CASE WHEN ITEM_TYPE = 'Feature Service' THEN SIZE/1024.0/1024.0*.25 ELSE 0 END)
+    AS TOTAL_CPM
+    
+FROM
+    ALL_ITEMS AI
+LEFT JOIN
+    (SELECT
+    ITEM_ID,
+    GROUP_CONCAT(CATEGORY) AS CATEGORIES,
+    COUNT(*) AS TOTALCATS
+    FROM CATEGORIES
+    GROUP BY ITEM_ID) CATS
+ON AI.ITEM_ID = CATS.ITEM_ID
+LEFT JOIN
+    USERS USERS
+ON AI.OWNER = USERS.USERNAME
+WHERE USERS.USERNAME IS NOT NULL
+GROUP BY REPLACE(CATEGORIES, '/Categories/','') 
+        )
+        """,
     """CREATE VIEW ITEM_CTGS as
             SELECT
             AI.ITEM_NAME,

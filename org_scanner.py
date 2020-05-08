@@ -45,7 +45,7 @@ item_scan(session_gis, inventory_dict, folder_dict, 15, just_me)
 # In[ ]:
 
 print(())
-output_to_sqlite(inventory_dict, r'./inventory.sqlite')
+output_to_sqlite(inventory_dict, r'./gtvm_20200508.sqlite')
 
 
 # In[ ]:
