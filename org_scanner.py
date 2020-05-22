@@ -13,8 +13,9 @@ from item_inventory import *
 
 url = input('ArcGIS Org URL: ')
 username = input('Username: ')
-session_gis = arcgis.GIS(url, username)
+session_gis = arcgis.GIS(url, username, set_active=False)
 just_me = False
+output_db = input('Output DB Path: ')
 
 
 # In[ ]:
@@ -44,8 +45,8 @@ item_scan(session_gis, inventory_dict, folder_dict, 15, just_me)
 
 # In[ ]:
 
-print(())
-output_to_sqlite(inventory_dict, r'./gtvm_20200508.sqlite')
+
+output_to_sqlite(inventory_dict, output_db)
 
 
 # In[ ]:

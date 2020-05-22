@@ -82,18 +82,23 @@ def item_grab(queue, dict_lists, folder_dict):
                 org = shared_with['org']
                 groups = len(shared_with['groups'])
             except:
-                shared_with = item_desc._portal.con.get('content/users/{}/items/{}'.format(item_desc._user_id,
-                                                                                           item_desc.id))['sharing']
-                if shared_with['access'] == 'public':
-                    everyone = True
-                    org = True
-                elif shared_with['access'] == 'org':
-                    everyone = False
-                    org = True
-                else:
+                try:
+                    shared_with = item_desc._portal.con.get('content/users/{}/items/{}'.format(item_desc._user_id,
+                                                                                               item_desc.id))['sharing']
+                    if shared_with['access'] == 'public':
+                        everyone = True
+                        org = True
+                    elif shared_with['access'] == 'org':
+                        everyone = False
+                        org = True
+                    else:
+                        everyone = False
+                        org = False
+                    groups = len(shared_with['groups'])
+                except:
                     everyone = False
                     org = False
-                groups = len(shared_with['groups'])
+                    groups = 99
 
             if item_desc.type == 'Feature Service':
                 # add to list of feature services
@@ -463,50 +468,38 @@ def output_to_sqlite(dict_lists, sqlite_path):
          GROUP BY ITEM_ID"""
          ,
     """
-SELECT
-    CATEGORY,
-    ITEMS,
-    PRINTF("%.2f", MB) AS MB,
-    FS_COUNT,
-    PRINTF("%.2f", FS_MB) AS FS_MB,
-    PRINTF("%.2f", FS_CPM) AS FS_CPM,
-    OTHER_COUNT,
-    PRINTF("%.2f", OTHER_MB) AS OTHER_MB,
-    PRINTF("%.2f", OTHER_CPM) AS OTHER_CPM,
-    PRINTF("%.2f", TOTAL_CPM) AS TOTAL_CPM
+        CREATE VIEW STORAGE_ESTIMATE AS
+        
+        SELECT
+            AI.ITEM_ID,
+            AI.ITEM_TYPE,
+            AI.FOLDER,
+            AI.OWNER,
+            REPLACE(CATEGORIES, '/Categories/','') AS CATEGORY,
+            SIZE/1024/1024 AS MB,
+            CASE WHEN ITEM_TYPE = 'Feature Service' THEN SIZE/1024.0/1024.0 ELSE 0 END AS FS_MB,
+            CASE WHEN ITEM_TYPE = 'Feature Service' THEN SIZE/1024.0/1024.0*.25 ELSE 0 END AS FS_CPM,
+            CASE WHEN ITEM_TYPE <> 'Feature Service' THEN SIZE/1024.0/1024.0 ELSE 0 END AS OTHER_MB,
+            CASE WHEN ITEM_TYPE <> 'Feature Service' THEN SIZE/1024.0/1024.0/1024.0*1.2 ELSE 0 END AS OTHER_CPM,
+                CASE WHEN ITEM_TYPE <> 'Feature Service' THEN SIZE/1024.0/1024.0/1024.0*1.2 ELSE 0 END +
+                CASE WHEN ITEM_TYPE = 'Feature Service' THEN SIZE/1024.0/1024.0*.25 ELSE 0 END
+            AS TOTAL_CPM
+            
+        FROM
+            ALL_ITEMS AI
+        LEFT JOIN
+            (SELECT
+            ITEM_ID,
+            GROUP_CONCAT(CATEGORY) AS CATEGORIES,
+            COUNT(*) AS TOTALCATS
+            FROM CATEGORIES
+            GROUP BY ITEM_ID) CATS
+        ON AI.ITEM_ID = CATS.ITEM_ID
+        LEFT JOIN
+            USERS USERS
+        ON AI.OWNER = USERS.USERNAME
+        WHERE USERS.USERNAME IS NOT NULL
 
-FROM
-
-(SELECT
-    REPLACE(CATEGORIES, '/Categories/','') AS CATEGORY,
-    COUNT(*) AS ITEMS,
-    SUM(SIZE)/1024/1024 AS MB,
-    SUM(CASE WHEN ITEM_TYPE = 'Feature Service' THEN 1 ELSE 0 END) AS FS_COUNT,
-    SUM(CASE WHEN ITEM_TYPE = 'Feature Service' THEN SIZE/1024.0/1024.0 ELSE 0 END) AS FS_MB,
-    SUM(CASE WHEN ITEM_TYPE = 'Feature Service' THEN SIZE/1024.0/1024.0*.25 ELSE 0 END) AS FS_CPM,
-    SUM(CASE WHEN ITEM_TYPE <> 'Feature Service' THEN 1 ELSE 0 END) AS OTHER_COUNT,
-    SUM(CASE WHEN ITEM_TYPE <> 'Feature Service' THEN SIZE/1024.0/1024.0 ELSE 0 END) AS OTHER_MB,
-    SUM(CASE WHEN ITEM_TYPE <> 'Feature Service' THEN SIZE/1024.0/1024.0/1024.0*1.2 ELSE 0 END) AS OTHER_CPM,
-        SUM(CASE WHEN ITEM_TYPE <> 'Feature Service' THEN SIZE/1024.0/1024.0/1024.0*1.2 ELSE 0 END) +
-        SUM(CASE WHEN ITEM_TYPE = 'Feature Service' THEN SIZE/1024.0/1024.0*.25 ELSE 0 END)
-    AS TOTAL_CPM
-    
-FROM
-    ALL_ITEMS AI
-LEFT JOIN
-    (SELECT
-    ITEM_ID,
-    GROUP_CONCAT(CATEGORY) AS CATEGORIES,
-    COUNT(*) AS TOTALCATS
-    FROM CATEGORIES
-    GROUP BY ITEM_ID) CATS
-ON AI.ITEM_ID = CATS.ITEM_ID
-LEFT JOIN
-    USERS USERS
-ON AI.OWNER = USERS.USERNAME
-WHERE USERS.USERNAME IS NOT NULL
-GROUP BY REPLACE(CATEGORIES, '/Categories/','') 
-        )
         """,
     """CREATE VIEW ITEM_CTGS as
             SELECT
