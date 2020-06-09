@@ -285,7 +285,7 @@ def group_scan(gis_object, dict_lists, num_threads):
     for i, group in enumerate(groups):
         q.put((i, group))
         
-    if num_threads < len(group):
+    if num_threads > len(group):
         num_threads = len(group)    
     
     for i in range(num_threads):
@@ -303,8 +303,12 @@ def user_grab(queue, dict_lists, folder_dict):
         user = work[1]
         username = user.username
         created = online_to_pst_time(user.created)
-        firstname = user.firstName
-        lastname = user.lastName
+        try:
+            firstname = user.firstName
+            lastname = user.lastName
+        except AttributeError:
+            firstname = ''
+            lastname = ''
         level = user.level
         roleID = user.roleId
         description = user.description
@@ -320,7 +324,7 @@ def user_grab(queue, dict_lists, folder_dict):
 
 
 def user_scan(gis_object, dict_lists, num_threads):
-    users = gis_object.users.search()
+    users = gis_object.users.search(max_users=9999)
     folder_dict = {None: None}
     
     q = Queue(maxsize=0)
@@ -328,7 +332,7 @@ def user_scan(gis_object, dict_lists, num_threads):
     for i, user in enumerate(users):
         q.put((i, user))
         
-    if num_threads < len(users):
+    if num_threads > len(users):
         num_threads = len(users)
     
     for i in range(num_threads):
@@ -472,6 +476,7 @@ def output_to_sqlite(dict_lists, sqlite_path):
         
         SELECT
             AI.ITEM_ID,
+            AI.ITEM_NAME,
             AI.ITEM_TYPE,
             AI.FOLDER,
             AI.OWNER,
