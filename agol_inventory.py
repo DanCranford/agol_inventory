@@ -552,3 +552,30 @@ def output_to_sqlite(dict_lists, sqlite_path):
         cursor.execute(statement)
     conn.close()
 
+
+def output_to_excel(dict_lists, output_excel):
+    with pandas.ExcelWriter(output_excel) as xl_writer:
+        for key in dict_lists:
+            df = pandas.DataFrame(dict_lists[key][1:], columns = dict_lists[key][0])
+            df.to_excel(xl_writer, sheet_name = key, index=False)
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

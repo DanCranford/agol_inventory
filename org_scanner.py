@@ -4,7 +4,7 @@
 # In[ ]:
 
 
-from item_inventory import *
+from agol_inventory import *
 
 
 # In[ ]:
