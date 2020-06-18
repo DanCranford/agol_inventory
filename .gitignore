@@ -1,2 +1,4 @@
 
 .ipynb_checkpoints/org_scanner-checkpoint.ipynb
+*.pyc
+*.pyc
