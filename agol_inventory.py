@@ -10,24 +10,6 @@ from queue import Queue
 from IPython.display import clear_output
 
 
-def update_progress(progress):
-    bar_length = 20
-    if isinstance(progress, int):
-        progress = float(progress)
-    if not isinstance(progress, float):
-        progress = 0
-    if progress < 0:
-        progress = 0
-    if progress >= 1:
-        progress = 1
-
-    block = int(round(bar_length * progress))
-
-    clear_output(wait = True)
-    text = "Progress: [{0}] {1:.1f}%".format( "#" * block + "-" * (bar_length - block), progress * 100)
-    print(text)
-
-
 def map_layer_editable(op_lyr):
     editing = False
     try:
@@ -55,6 +37,7 @@ def dlist_to_sqlite(dlist, connection, table_name, **kwargs):
 def item_grab(queue, dict_lists, folder_dict):
     # common attributes
     while not queue.empty():
+        start = time.time()
         work = queue.get()
         item_desc = work[1]
         try:
@@ -176,6 +159,8 @@ def item_grab(queue, dict_lists, folder_dict):
             print('something went wrong')
             print(e)
         queue.task_done()
+        duration = time.time() - start 
+        print(name, duration)
     return True
 
 
