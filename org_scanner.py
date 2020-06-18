@@ -14,7 +14,7 @@ from agol_inventory import *
 url = input('ArcGIS Org URL: ')
 username = input('Username: ')
 session_gis = arcgis.GIS(url, username, set_active=False, verify_cert = False)
-just_me = False
+depth = 'org'
 output_db = input('Output DB Path: ')
 thread_count = 15
 
@@ -40,7 +40,7 @@ folder_dict = user_scan(session_gis, inventory_dict, thread_count)
 
 
 print('Scanning Items...')
-item_scan(session_gis, inventory_dict, folder_dict, thread_count, just_me)
+item_scan(session_gis, inventory_dict, folder_dict, thread_count, depth)
 
 
 # In[ ]:

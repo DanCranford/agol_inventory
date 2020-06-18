@@ -7,7 +7,6 @@ import pandas
 import sqlite3
 from threading import Thread
 from queue import Queue
-from IPython.display import clear_output
 
 
 def map_layer_editable(op_lyr):
@@ -37,7 +36,7 @@ def dlist_to_sqlite(dlist, connection, table_name, **kwargs):
 def item_grab(queue, dict_lists, folder_dict):
     # common attributes
     while not queue.empty():
-        start = time.time()
+        # start = time.time()
         work = queue.get()
         item_desc = work[1]
         try:
@@ -159,29 +158,57 @@ def item_grab(queue, dict_lists, folder_dict):
             print('something went wrong')
             print(e)
         queue.task_done()
-        duration = time.time() - start 
-        print(name, duration)
+        # duration = time.time() - start 
+        # print(name, duration)
     return True
 
 
-def item_scan(gis_object, dict_lists, folder_dict, num_threads, justme=False):
+def item_scan(gis_object, dict_lists, folder_dict, num_threads=15, depth='org'):
+    '''
+    
+
+    Parameters
+    ----------
+    gis_object : arcgis.GIS
+        arcgis GIS object containing your login information.
+    dict_lists : dictionary
+        prepared by another function in this. stores information from your scan.
+    folder_dict : TYPE
+        DESCRIPTION.
+    num_threads : str
+        Number of threads to use in scan.  ArcGIS Online performs fine with 15.
+        For ArcGIS Portal, you may want to drop the number
+    depth : str, optional
+        Level to which you want to scan. 
+        'user' : limits the scan to only the user.
+        'org' : only items in the user's organization
+        'extended' : scans all available items to user. Including shared items
+            from other organizations. 
+        The default is 'org'.
+
+    Returns
+    -------
+    None.
+
+    '''
     try:
-        if justme:
+        if depth == 'user':
             item_list = gis_object.content.advanced_search('owner:{}'.format(gis_object.users.me.username), max_items=9999)['results']
         else:
             item_list = gis_object.content.advanced_search('accountid: {}'.format(gis_object.properties.get('id')), 
                                                                max_items = 9999)['results']
     except:
-        if justme:
+        if depth == 'user':
             item_list = gis_object.content.search('owner:{}'.format(gis_object.users.me.username), max_items=9999)
         else:
             item_list = gis_object.content.search('*', max_items = 9999)
-            
-    itemids = [item.id for item in item_list]
-    for itemid in dict_lists['temp_shared_items']:
-        if itemid not in itemids:
-            item_list.append(dict_lists['temp_shared_items'][itemid])
     
+    if depth == 'extended':
+        itemids = [item.id for item in item_list]
+        for itemid in dict_lists['temp_shared_items']:
+            if itemid not in itemids:
+                item_list.append(dict_lists['temp_shared_items'][itemid])
+        
     q = Queue(maxsize=0)
 
     for i, item in enumerate(item_list):
