@@ -309,7 +309,7 @@ def group_scan(gis_object, dict_lists, num_threads):
     
     
     
-def user_grab(queue, dict_lists, folder_dict):
+def user_grab(queue, dict_lists, folder_dict, role_dict):
     while not queue.empty():
         work = queue.get()
         user = work[1]
@@ -322,7 +322,10 @@ def user_grab(queue, dict_lists, folder_dict):
             firstname = ''
             lastname = ''
         level = user.level
-        roleID = user.roleId
+        try:
+            roleID = role_dict[user.roleId]
+        except KeyError:
+            roleID = user.roleId
         description = user.description
         last_login = online_to_pst_time(user.lastLogin)
         dict_lists['USERS'].append([username, firstname, lastname, level, roleID, created, last_login, description])
@@ -339,6 +342,8 @@ def user_scan(gis_object, dict_lists, num_threads):
     users = gis_object.users.search(max_users=9999)
     folder_dict = {None: None}
     
+    role_dict = {role.role_id: role.name for role in arcgis.gis.RoleManager(gis_object).all()}
+    
     q = Queue(maxsize=0)
 
     for i, user in enumerate(users):
@@ -348,7 +353,7 @@ def user_scan(gis_object, dict_lists, num_threads):
         num_threads = len(users)
     
     for i in range(num_threads):
-        worker = Thread(target=user_grab, args=(q, dict_lists, folder_dict))
+        worker = Thread(target=user_grab, args=(q, dict_lists, folder_dict, role_dict))
         worker.setDaemon(True)
         worker.start()
 
@@ -571,10 +576,6 @@ def output_to_excel(dict_lists, output_excel):
             df = pandas.DataFrame(dict_lists[key][1:], columns = dict_lists[key][0])
             df.to_excel(xl_writer, sheet_name = key, index=False)
     
-
-
-
-
 
 
 
