@@ -3,8 +3,8 @@
 import arcgis
 # import arcpy
 import time
-import pandas
-import sqlite3
+# import pandas
+# import sqlite3
 from threading import Thread
 from queue import Queue
 
@@ -24,13 +24,6 @@ def map_layer_editable(op_lyr):
 def online_to_pst_time(time_value):
     pst_time = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime((time_value / 1000.0) - 25200))
     return pst_time
-
-
-def dlist_to_sqlite(dlist, connection, table_name, **kwargs):
-    df = pandas.DataFrame(dlist[1:], columns=dlist[0])
-    df.index.name = 'OID'
-    df.to_sql(table_name, connection, if_exists='replace', **kwargs)
-    connection.commit()
 
     
 def item_grab(queue, dict_lists, folder_dict):

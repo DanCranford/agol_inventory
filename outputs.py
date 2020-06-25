@@ -1,3 +1,16 @@
+import sqlite3
+import pandas
+import time
+
+
+
+
+def dlist_to_sqlite(dlist, connection, table_name, **kwargs):
+    df = pandas.DataFrame(dlist[1:], columns=dlist[0])
+    df.index.name = 'OID'
+    df.to_sql(table_name, connection, if_exists='replace', **kwargs)
+    connection.commit()
+
 
 def output_to_sqlite(dict_lists, sqlite_path):
     sql_views = [
