@@ -3,29 +3,10 @@
 import arcgis
 # import arcpy
 import time
-import pandas
-import sqlite3
+# import pandas
+# import sqlite3
 from threading import Thread
 from queue import Queue
-from IPython.display import clear_output
-
-
-def update_progress(progress):
-    bar_length = 20
-    if isinstance(progress, int):
-        progress = float(progress)
-    if not isinstance(progress, float):
-        progress = 0
-    if progress < 0:
-        progress = 0
-    if progress >= 1:
-        progress = 1
-
-    block = int(round(bar_length * progress))
-
-    clear_output(wait = True)
-    text = "Progress: [{0}] {1:.1f}%".format( "#" * block + "-" * (bar_length - block), progress * 100)
-    print(text)
 
 
 def map_layer_editable(op_lyr):
@@ -44,17 +25,11 @@ def online_to_pst_time(time_value):
     pst_time = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime((time_value / 1000.0) - 25200))
     return pst_time
 
-
-def dlist_to_sqlite(dlist, connection, table_name, **kwargs):
-    df = pandas.DataFrame(dlist[1:], columns=dlist[0])
-    df.index.name = 'OID'
-    df.to_sql(table_name, connection, if_exists='replace', **kwargs)
-    connection.commit()
-
     
 def item_grab(queue, dict_lists, folder_dict):
     # common attributes
     while not queue.empty():
+        # start = time.time()
         work = queue.get()
         item_desc = work[1]
         try:
@@ -176,27 +151,57 @@ def item_grab(queue, dict_lists, folder_dict):
             print('something went wrong')
             print(e)
         queue.task_done()
+        # duration = time.time() - start 
+        # print(name, duration)
     return True
 
 
-def item_scan(gis_object, dict_lists, folder_dict, num_threads, justme=False):
+def item_scan(gis_object, dict_lists, folder_dict, num_threads=15, depth='org'):
+    '''
+    
+
+    Parameters
+    ----------
+    gis_object : arcgis.GIS
+        arcgis GIS object containing your login information.
+    dict_lists : dictionary
+        prepared by another function in this. stores information from your scan.
+    folder_dict : TYPE
+        DESCRIPTION.
+    num_threads : str
+        Number of threads to use in scan.  ArcGIS Online performs fine with 15.
+        For ArcGIS Portal, you may want to drop the number
+    depth : str, optional
+        Level to which you want to scan. 
+        'user' : limits the scan to only the user.
+        'org' : only items in the user's organization
+        'extended' : scans all available items to user. Including shared items
+            from other organizations. 
+        The default is 'org'.
+
+    Returns
+    -------
+    None.
+
+    '''
     try:
-        if justme:
+        if depth == 'user':
             item_list = gis_object.content.advanced_search('owner:{}'.format(gis_object.users.me.username), max_items=9999)['results']
         else:
             item_list = gis_object.content.advanced_search('accountid: {}'.format(gis_object.properties.get('id')), 
                                                                max_items = 9999)['results']
     except:
-        if justme:
+        if depth == 'user':
             item_list = gis_object.content.search('owner:{}'.format(gis_object.users.me.username), max_items=9999)
         else:
             item_list = gis_object.content.search('*', max_items = 9999)
-            
-    itemids = [item.id for item in item_list]
-    for itemid in dict_lists['temp_shared_items']:
-        if itemid not in itemids:
-            item_list.append(dict_lists['temp_shared_items'][itemid])
     
+    if depth == 'extended':
+        itemids = [item.id for item in item_list]
+        for itemid in dict_lists['temp_shared_items']:
+            if itemid not in itemids:
+                item_list.append(dict_lists['temp_shared_items'][itemid])
+        
     q = Queue(maxsize=0)
 
     for i, item in enumerate(item_list):
@@ -297,7 +302,7 @@ def group_scan(gis_object, dict_lists, num_threads):
     
     
     
-def user_grab(queue, dict_lists, folder_dict):
+def user_grab(queue, dict_lists, folder_dict, role_dict):
     while not queue.empty():
         work = queue.get()
         user = work[1]
@@ -310,7 +315,10 @@ def user_grab(queue, dict_lists, folder_dict):
             firstname = ''
             lastname = ''
         level = user.level
-        roleID = user.roleId
+        try:
+            roleID = role_dict[user.roleId]
+        except KeyError:
+            roleID = user.roleId
         description = user.description
         last_login = online_to_pst_time(user.lastLogin)
         dict_lists['USERS'].append([username, firstname, lastname, level, roleID, created, last_login, description])
@@ -327,6 +335,8 @@ def user_scan(gis_object, dict_lists, num_threads):
     users = gis_object.users.search(max_users=9999)
     folder_dict = {None: None}
     
+    role_dict = {role.role_id: role.name for role in arcgis.gis.RoleManager(gis_object).all()}
+    
     q = Queue(maxsize=0)
 
     for i, user in enumerate(users):
@@ -336,246 +346,11 @@ def user_scan(gis_object, dict_lists, num_threads):
         num_threads = len(users)
     
     for i in range(num_threads):
-        worker = Thread(target=user_grab, args=(q, dict_lists, folder_dict))
+        worker = Thread(target=user_grab, args=(q, dict_lists, folder_dict, role_dict))
         worker.setDaemon(True)
         worker.start()
 
     q.join()   
     return folder_dict
     
-
-def output_to_sqlite(dict_lists, sqlite_path):
-    sql_views = [
-        """CREATE VIEW APPS_TO_MAPS AS
-        SELECT *
-          FROM WEB_APPS WA
-               LEFT JOIN
-               WEB_MAPS WM ON WA.WEBMAP_ID = WM.ITEM_ID;"""
-        ,
-        """CREATE VIEW BROKEN_LAYERS AS
-        SELECT REL.WEBMAP_TITLE,
-               REL.LAYER_NAME,
-               FS.ITEM_NAME AS FS_NAME,
-               WM.SHARED AS WM_SHARED,
-               FS.SHARED AS FS_SHARED
-          FROM MAP_FS_REL REL
-               LEFT JOIN
-               WEB_MAPS WM ON REL.WEBMAP_ID = WM.ITEM_ID
-               LEFT JOIN
-               FEATURE_SERVICES FS ON REL.LAYER_ITEM_ID = FS.ITEM_ID
-         WHERE WM.SHARED <> FS.SHARED AND 
-               FS.SHARED = 'Private';"""
-        ,
-        """CREATE VIEW ALL_ITEMS AS
-        SELECT ITEM_TYPE,
-               ITEM_NAME,
-               FOLDER,
-               SHARED,
-               EVERYONE,
-               ORG,
-               GROUPS,
-               OWNER,
-               CREATEDATE,
-               MODATE,
-               ITEM_ID,
-               SIZE,
-               CONTENT_STATUS
-          FROM FEATURE_SERVICES
-        UNION ALL
-        SELECT ITEM_TYPE,
-               ITEM_NAME,
-               FOLDER,
-               SHARED,
-               EVERYONE,
-               ORG,
-               GROUPS,
-               OWNER,
-               CREATEDATE,
-               MODATE,
-               ITEM_ID,
-               SIZE,
-               CONTENT_STATUS
-          FROM WEB_MAPS
-        UNION ALL
-        SELECT ITEM_TYPE,
-               ITEM_NAME,
-               FOLDER,
-               SHARED,
-               EVERYONE,
-               ORG,
-               GROUPS,
-               OWNER,
-               CREATEDATE,
-               MODATE,
-               ITEM_ID,
-               SIZE,
-               CONTENT_STATUS
-          FROM WEB_APPS
-        UNION ALL
-        SELECT ITEM_TYPE,
-               ITEM_NAME,
-               FOLDER,
-               SHARED,
-               EVERYONE,
-               ORG,
-               GROUPS,
-               OWNER,
-               CREATEDATE,
-               MODATE,
-               ITEM_ID,
-               SIZE,
-               CONTENT_STATUS
-          FROM OTHER_ITEMS;
-    """
-        ,
-        """CREATE VIEW SHARED_EVERYONE AS
-        SELECT *
-          FROM ALL_ITEMS
-         WHERE EVERYONE = 1
-         ORDER BY OWNER;"""
-        ,
-        """CREATE VIEW GROUPS_ZEROMEMBERS AS
-        SELECT *
-          FROM GROUPS
-         WHERE MEMBERCOUNT = 0;"""
-        ,
-        """CREATE VIEW USERS_NEVERLOGIN AS
-        SELECT *
-          FROM USERS
-         WHERE LAST_LOGIN = -1;"""
-        ,
-        """CREATE VIEW USERS_VIEW AS
-        SELECT USERNAME,
-               FIRSTNAME,
-               LASTNAME,
-               LEVEL,
-               ROLE,
-               CREATED,
-               LAST_LOGIN,
-               ROUND(JULIANDAY({}, 'unixepoch','localtime') - JULIANDAY(LAST_LOGIN),-2) AS DAYS_STAGNANT,
-               DESCRIPTION
-          FROM USERS;""".format(time.time())
-        ,
-        """CREATE VIEW OTO_FS_MAP AS
-        SELECT LAYER_ITEM_ID,
-               WEBMAP_ID
-          FROM MAP_FS_REL
-         GROUP BY LAYER_ITEM_ID,
-                  WEBMAP_ID;"""
-        ,
-        """CREATE VIEW SHARING_GROUPS AS
-        SELECT
-          ITEM_ID,
-        COUNT(*) AS GROUP_COUNT,
-        GROUP_CONCAT(GROUP_NAME) AS GROUPS
-         FROM SHARING
-         GROUP BY ITEM_ID"""
-         ,
-    """
-        CREATE VIEW STORAGE_ESTIMATE AS
-        
-        SELECT
-            AI.ITEM_ID,
-            AI.ITEM_NAME,
-            AI.ITEM_TYPE,
-            AI.FOLDER,
-            AI.OWNER,
-            REPLACE(CATEGORIES, '/Categories/','') AS CATEGORY,
-            SIZE/1024/1024 AS MB,
-            CASE WHEN ITEM_TYPE = 'Feature Service' THEN SIZE/1024.0/1024.0 ELSE 0 END AS FS_MB,
-            CASE WHEN ITEM_TYPE = 'Feature Service' THEN SIZE/1024.0/1024.0*.25 ELSE 0 END AS FS_CPM,
-            CASE WHEN ITEM_TYPE <> 'Feature Service' THEN SIZE/1024.0/1024.0 ELSE 0 END AS OTHER_MB,
-            CASE WHEN ITEM_TYPE <> 'Feature Service' THEN SIZE/1024.0/1024.0/1024.0*1.2 ELSE 0 END AS OTHER_CPM,
-                CASE WHEN ITEM_TYPE <> 'Feature Service' THEN SIZE/1024.0/1024.0/1024.0*1.2 ELSE 0 END +
-                CASE WHEN ITEM_TYPE = 'Feature Service' THEN SIZE/1024.0/1024.0*.25 ELSE 0 END
-            AS TOTAL_CPM
-            
-        FROM
-            ALL_ITEMS AI
-        LEFT JOIN
-            (SELECT
-            ITEM_ID,
-            GROUP_CONCAT(CATEGORY) AS CATEGORIES,
-            COUNT(*) AS TOTALCATS
-            FROM CATEGORIES
-            GROUP BY ITEM_ID) CATS
-        ON AI.ITEM_ID = CATS.ITEM_ID
-        LEFT JOIN
-            USERS USERS
-        ON AI.OWNER = USERS.USERNAME
-        WHERE USERS.USERNAME IS NOT NULL
-
-        """,
-    """CREATE VIEW ITEM_CTGS as
-            SELECT
-            AI.ITEM_NAME,
-            AI.ITEM_TYPE,
-            AI.OWNER,
-            AI.FOLDER,
-            AI.SHARED,
-            AI.SIZE/1024/1024 AS MB,
-            TT.TAGS,
-            SG.GROUPS,
-            CATS.CATEGORIES,
-            AI.ITEM_ID        
-        FROM
-            ALL_ITEMS AI
-        LEFT JOIN
-            (SELECT
-            ITEM_ID,
-            GROUP_CONCAT(REPLACE(CATEGORY,'/Categories/','')) AS CATEGORIES,
-            COUNT(*) AS TOTALCATS
-            FROM CATEGORIES
-            GROUP BY ITEM_ID) CATS
-        ON 
-            AI.ITEM_ID = CATS.ITEM_ID
-        LEFT JOIN
-            (SELECT
-                ITEM_ID,
-                GROUP_CONCAT(TAG) AS TAGS
-            FROM TAGS
-            GROUP BY ITEM_ID) TT
-        ON 
-            AI.ITEM_ID = TT.ITEM_ID
-        LEFT JOIN
-            SHARING_GROUPS SG
-        ON 
-            AI.ITEM_ID = SG.ITEM_ID"""
-        ]
-
-    conn = sqlite3.connect(sqlite_path)
-    for key in dict_lists:
-        dlist_to_sqlite(dict_lists[key], conn, key)
-
-    cursor = sqlite3.Cursor(conn)
-    for statement in sql_views:
-        cursor.execute(statement)
-    conn.close()
-
-
-def output_to_excel(dict_lists, output_excel):
-    with pandas.ExcelWriter(output_excel) as xl_writer:
-        for key in dict_lists:
-            df = pandas.DataFrame(dict_lists[key][1:], columns = dict_lists[key][0])
-            df.to_excel(xl_writer, sheet_name = key, index=False)
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

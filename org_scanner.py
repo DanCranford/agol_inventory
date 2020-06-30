@@ -11,11 +11,11 @@ from agol_inventory import *
 
 
 
-url = input('ArcGIS Org URL: ')
-username = input('Username: ')
+url = 'https://gtvm.maps.arcgis.com' #input('ArcGIS Org URL: ')
+username = 'GTVMAPS' #input('Username: ')
 session_gis = arcgis.GIS(url, username, set_active=False, verify_cert = False)
-just_me = False
-output_db = input('Output DB Path: ')
+depth = 'extended'
+output_db = './gtvm.sqlite' #input('Output DB Path: ')
 thread_count = 15
 
 # In[ ]:
@@ -40,13 +40,13 @@ folder_dict = user_scan(session_gis, inventory_dict, thread_count)
 
 
 print('Scanning Items...')
-item_scan(session_gis, inventory_dict, folder_dict, thread_count, just_me)
+item_scan(session_gis, inventory_dict, folder_dict, thread_count, depth)
 
 
 # In[ ]:
 
 
-output_to_sqlite(inventory_dict, output_db)
+# output_to_sqlite(inventory_dict, output_db)
 
 
 # In[ ]:
