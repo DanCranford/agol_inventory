@@ -46,6 +46,11 @@ def item_grab(queue, dict_lists, folder_dict):
             itemid = item_desc.id
             size = item_desc.size
             content_status = item_desc.content_status
+            
+            rating = item_desc.avgRating
+            num_views = item_desc.numViews
+            md_score = item_desc.scoreCompleteness
+            
             if item_desc.categories:
                 for category in item_desc.categories:
                     dict_lists['CATEGORIES'].append([itemid, category])
@@ -91,12 +96,12 @@ def item_grab(queue, dict_lists, folder_dict):
                     source_item_name = None
                 dict_lists['FEATURE_SERVICES'].append(
                     [item_desc.type, name, folder_desc, shared, everyone, org, groups, owner_desc, created, modified,
-                     itemid, is_view, source_item_id, source_item_name, size, content_status])
+                     itemid, is_view, source_item_id, source_item_name, size, content_status, rating, num_views, md_score])
             elif item_desc.type == 'Web Map':
                 # add to list of mapsg
                 dict_lists['WEB_MAPS'].append(
                     [item_desc.type, name, folder_desc, shared, everyone, org, groups, owner_desc, created, modified,
-                     itemid, size, content_status])
+                     itemid, size, content_status, rating, num_views, md_score])
                 webmap = arcgis.mapping.WebMap(item_desc)
                 for layer in webmap.layers:
                     try:
@@ -141,11 +146,11 @@ def item_grab(queue, dict_lists, folder_dict):
 
                 dict_lists['WEB_APPS'].append(
                     [item_desc.type, name, folder_desc, shared, everyone, org, groups, owner_desc, created, modified,
-                     itemid, apptoMapID, size, content_status])
+                     itemid, apptoMapID, size, content_status, rating, num_views, md_score])
             else:
                 dict_lists['OTHER_ITEMS'].append(
                     [item_desc.type, name, folder_desc, shared, everyone, org, groups, owner_desc, created, modified,
-                     itemid, size, content_status])
+                     itemid, size, content_status, rating, num_views, md_score])
         except Exception as e:
             print(item_desc)
             print('something went wrong')
@@ -223,7 +228,7 @@ def set_up_dict_lists():
     return {
         'FEATURE_SERVICES': [
             ['ITEM_TYPE', 'ITEM_NAME', 'FOLDER', 'SHARED', 'EVERYONE', 'ORG', 'GROUPS', 'OWNER', 'CREATEDATE', 'MODATE',
-             'ITEM_ID', 'ISVIEW', 'SOURCE_ITEM_ID', 'SOURCE_ITEM_NAME', 'SIZE', 'CONTENT_STATUS']],
+             'ITEM_ID', 'ISVIEW', 'SOURCE_ITEM_ID', 'SOURCE_ITEM_NAME', 'SIZE', 'CONTENT_STATUS', 'RATING', 'NUM_VIEWS', 'MD_SCORE']],
         'GROUP_MEMBERSHIP': [
             ['GROUP_NAME', 'MEMBER', 'MEMBERTYPE']],
         'GROUPS': [
@@ -232,13 +237,13 @@ def set_up_dict_lists():
             ['WEBMAP_TITLE', 'WEBMAP_ID', 'LAYER_NAME', 'EDITABLE', 'LAYER_FILTER', 'LAYER_ITEM_ID', 'LAYER_URL']],
         'WEB_APPS': [
             ['ITEM_TYPE', 'ITEM_NAME', 'FOLDER', 'SHARED', 'EVERYONE', 'ORG', 'GROUPS', 'OWNER', 'CREATEDATE', 'MODATE',
-             'ITEM_ID', 'WEBMAP_ID', 'SIZE', 'CONTENT_STATUS']],
+             'ITEM_ID', 'WEBMAP_ID', 'SIZE', 'CONTENT_STATUS', 'RATING', 'NUM_VIEWS', 'MD_SCORE']],
         'WEB_MAPS': [
             ['ITEM_TYPE', 'ITEM_NAME', 'FOLDER', 'SHARED', 'EVERYONE', 'ORG', 'GROUPS', 'OWNER', 'CREATEDATE', 'MODATE',
-             'ITEM_ID', 'SIZE', 'CONTENT_STATUS']],
+             'ITEM_ID', 'SIZE', 'CONTENT_STATUS', 'RATING', 'NUM_VIEWS', 'MD_SCORE']],
         'OTHER_ITEMS': [
             ['ITEM_TYPE', 'ITEM_NAME', 'FOLDER', 'SHARED', 'EVERYONE', 'ORG', 'GROUPS', 'OWNER', 'CREATEDATE', 'MODATE',
-             'ITEM_ID', 'SIZE', 'CONTENT_STATUS']],
+             'ITEM_ID', 'SIZE', 'CONTENT_STATUS', 'RATING', 'NUM_VIEWS', 'MD_SCORE']],
         'SHARING': [
             ['ITEM_ID', 'GROUP_NAME']],
         'USERS': [
@@ -397,7 +402,10 @@ def output_to_sqlite(dict_lists, sqlite_path):
                MODATE,
                ITEM_ID,
                SIZE,
-               CONTENT_STATUS
+               CONTENT_STATUS,
+               RATING,
+               NUM_VIEWS,
+               MD_SCORE
           FROM FEATURE_SERVICES
         UNION ALL
         SELECT ITEM_TYPE,
@@ -412,7 +420,10 @@ def output_to_sqlite(dict_lists, sqlite_path):
                MODATE,
                ITEM_ID,
                SIZE,
-               CONTENT_STATUS
+               CONTENT_STATUS,
+               RATING,
+               NUM_VIEWS,
+               MD_SCORE
           FROM WEB_MAPS
         UNION ALL
         SELECT ITEM_TYPE,
@@ -427,7 +438,10 @@ def output_to_sqlite(dict_lists, sqlite_path):
                MODATE,
                ITEM_ID,
                SIZE,
-               CONTENT_STATUS
+               CONTENT_STATUS,
+               RATING,
+               NUM_VIEWS,
+               MD_SCORE
           FROM WEB_APPS
         UNION ALL
         SELECT ITEM_TYPE,
@@ -442,7 +456,10 @@ def output_to_sqlite(dict_lists, sqlite_path):
                MODATE,
                ITEM_ID,
                SIZE,
-               CONTENT_STATUS
+               CONTENT_STATUS,
+               RATING,
+               NUM_VIEWS,
+               MD_SCORE
           FROM OTHER_ITEMS;
     """
         ,
