@@ -9,6 +9,14 @@ from threading import Thread
 from queue import Queue
 
 
+def get_last_edited_date_fs(item):
+    try:
+        max_date =  max([layer.properties.editingInfo['lastEditDate'] for layer in item.layers])
+        return online_to_pst_time(max_date)
+    except:
+        return None
+
+
 def map_layer_editable(op_lyr):
     editing = False
     try:
@@ -94,9 +102,10 @@ def item_grab(queue, dict_lists, folder_dict):
                     is_view = False
                     source_item_id = None
                     source_item_name = None
+                date_edited = get_last_edited_date_fs(item_desc)
                 dict_lists['FEATURE_SERVICES'].append(
                     [item_desc.type, name, folder_desc, shared, everyone, org, groups, owner_desc, created, modified,
-                     itemid, is_view, source_item_id, source_item_name, size, content_status, rating, num_views, md_score])
+                     itemid, is_view, source_item_id, source_item_name, size, content_status, date_edited, rating, num_views, md_score])
             elif item_desc.type == 'Web Map':
                 # add to list of mapsg
                 dict_lists['WEB_MAPS'].append(
@@ -228,7 +237,7 @@ def set_up_dict_lists():
     return {
         'FEATURE_SERVICES': [
             ['ITEM_TYPE', 'ITEM_NAME', 'FOLDER', 'SHARED', 'EVERYONE', 'ORG', 'GROUPS', 'OWNER', 'CREATEDATE', 'MODATE',
-             'ITEM_ID', 'ISVIEW', 'SOURCE_ITEM_ID', 'SOURCE_ITEM_NAME', 'SIZE', 'CONTENT_STATUS', 'RATING', 'NUM_VIEWS', 'MD_SCORE']],
+             'ITEM_ID', 'ISVIEW', 'SOURCE_ITEM_ID', 'SOURCE_ITEM_NAME', 'SIZE', 'CONTENT_STATUS', 'DATE_EDITED', 'RATING', 'NUM_VIEWS', 'MD_SCORE']],
         'GROUP_MEMBERSHIP': [
             ['GROUP_NAME', 'MEMBER', 'MEMBERTYPE']],
         'GROUPS': [
@@ -247,7 +256,8 @@ def set_up_dict_lists():
         'SHARING': [
             ['ITEM_ID', 'GROUP_NAME']],
         'USERS': [
-            ['USERNAME', 'FIRSTNAME', 'LASTNAME', 'LEVEL', 'ROLE', 'CREATED', 'LAST_LOGIN', 'DESCRIPTION']],
+            ['USERNAME', 'FIRSTNAME', 'LASTNAME', 'LEVEL', 'ROLE', 'CREATED', 'LAST_LOGIN', 
+             'DESCRIPTION', 'EMAIL', 'ESRI_ACCESS', 'DISABLED']],
         'CATEGORIES': [
             ['ITEM_ID', 'CATEGORY']],
         'TAGS': [
@@ -321,12 +331,24 @@ def user_grab(queue, dict_lists, folder_dict, role_dict):
             lastname = ''
         level = user.level
         try:
-            roleID = role_dict[user.roleId]
-        except KeyError:
-            roleID = user.roleId
+            roleID = user.role
+        except:
+            try:
+                roleID = role_dict[user.roleId]
+            except KeyError:
+                roleID = user.roleId
         description = user.description
         last_login = online_to_pst_time(user.lastLogin)
-        dict_lists['USERS'].append([username, firstname, lastname, level, roleID, created, last_login, description])
+        email = user.email
+        esri_access = user.esri_access
+
+        # credits_av = user.availableCredits
+        # doesn't work if you're not the admin
+        # credits_av = None
+        disabled = user.disabled
+        # add_ons = ','.join([item.title for item in user.provisions])
+        # add_ons = None
+        dict_lists['USERS'].append([username, firstname, lastname, level, roleID, created, last_login, description, email, esri_access, disabled])
         try:
             for folder in user.folders:
                 folder_dict[folder['id']] = folder['title']
@@ -340,6 +362,8 @@ def user_scan(gis_object, dict_lists, num_threads):
     users = gis_object.users.search(max_users=9999)
     folder_dict = {None: None}
     
+    # this looks to have been made obsolete. user.role is a  thing now.  
+    # not taking it out for legacy versions of arcgis.
     role_dict = {role.role_id: role.name for role in arcgis.gis.RoleManager(gis_object).all()}
     
     q = Queue(maxsize=0)
