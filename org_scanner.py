@@ -14,7 +14,7 @@ from agol_inventory import *
 url = input('ArcGIS Org URL: ')
 username = input('Username: ')
 session_gis = arcgis.GIS(url, username, set_active=False, verify_cert = False)
-depth = 'org'
+depth = 'user'
 output_db = input('Output DB Path: ')
 thread_count = 15
 

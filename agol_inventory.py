@@ -89,9 +89,14 @@ def item_grab(queue, dict_lists, folder_dict):
                     is_view = False
                     source_item_id = None
                     source_item_name = None
+                # item url added 20211019
+                try:
+                    item_url = item_desc.url
+                except:
+                    item_url = None                
                 dict_lists['FEATURE_SERVICES'].append(
                     [item_desc.type, name, folder_desc, shared, everyone, org, groups, owner_desc, created, modified,
-                     itemid, is_view, source_item_id, source_item_name, size, content_status])
+                     itemid, is_view, source_item_id, source_item_name, size, content_status, item_url])
             elif item_desc.type == 'Web Map':
                 # add to list of mapsg
                 dict_lists['WEB_MAPS'].append(
@@ -223,7 +228,7 @@ def set_up_dict_lists():
     return {
         'FEATURE_SERVICES': [
             ['ITEM_TYPE', 'ITEM_NAME', 'FOLDER', 'SHARED', 'EVERYONE', 'ORG', 'GROUPS', 'OWNER', 'CREATEDATE', 'MODATE',
-             'ITEM_ID', 'ISVIEW', 'SOURCE_ITEM_ID', 'SOURCE_ITEM_NAME', 'SIZE', 'CONTENT_STATUS']],
+             'ITEM_ID', 'ISVIEW', 'SOURCE_ITEM_ID', 'SOURCE_ITEM_NAME', 'SIZE', 'CONTENT_STATUS','ITEM_URL']],
         'GROUP_MEMBERSHIP': [
             ['GROUP_NAME', 'MEMBER', 'MEMBERTYPE']],
         'GROUPS': [
