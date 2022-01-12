@@ -71,18 +71,24 @@ def item_grab(queue, dict_lists, folder_dict):
                 groups = len(shared_with['groups'])
             except:
                 try:
-                    shared_with = item_desc._portal.con.get('content/users/{}/items/{}'.format(item_desc._user_id,
+                    try:
+                        shared_with = item_desc.shared_with
+                        everyone = shared_with['everyone']
+                        org = shared_with['org']
+                        groups = len(shared_with['groups'])
+                    except:
+                        shared_with = item_desc._portal.con.get('content/users/{}/items/{}'.format(item_desc._user_id,
                                                                                                item_desc.id))['sharing']
-                    if shared_with['access'] == 'public':
-                        everyone = True
-                        org = True
-                    elif shared_with['access'] == 'org':
-                        everyone = False
-                        org = True
-                    else:
-                        everyone = False
-                        org = False
-                    groups = len(shared_with['groups'])
+                        if shared_with['access'] == 'public':
+                            everyone = True
+                            org = True
+                        elif shared_with['access'] == 'org':
+                            everyone = False
+                            org = True
+                        else:
+                            everyone = False
+                            org = False
+                        groups = len(shared_with['groups'])
                 except:
                     everyone = False
                     org = False
@@ -105,12 +111,12 @@ def item_grab(queue, dict_lists, folder_dict):
                 date_edited = get_last_edited_date_fs(item_desc)
                 dict_lists['FEATURE_SERVICES'].append(
                     [item_desc.type, name, folder_desc, shared, everyone, org, groups, owner_desc, created, modified,
-                     itemid, is_view, source_item_id, source_item_name, size, content_status, date_edited, rating, num_views, md_score])
+                     itemid, is_view, source_item_id, source_item_name, size, content_status, date_edited, rating, num_views, md_score, snippet, description])
             elif item_desc.type == 'Web Map':
                 # add to list of mapsg
                 dict_lists['WEB_MAPS'].append(
                     [item_desc.type, name, folder_desc, shared, everyone, org, groups, owner_desc, created, modified,
-                     itemid, size, content_status, rating, num_views, md_score])
+                     itemid, size, content_status, rating, num_views, md_score, snippet, description])
                 webmap = arcgis.mapping.WebMap(item_desc)
                 for layer in webmap.layers:
                     try:
@@ -155,11 +161,11 @@ def item_grab(queue, dict_lists, folder_dict):
 
                 dict_lists['WEB_APPS'].append(
                     [item_desc.type, name, folder_desc, shared, everyone, org, groups, owner_desc, created, modified,
-                     itemid, apptoMapID, size, content_status, rating, num_views, md_score])
+                     itemid, apptoMapID, size, content_status, rating, num_views, md_score, snippet, description])
             else:
                 dict_lists['OTHER_ITEMS'].append(
                     [item_desc.type, name, folder_desc, shared, everyone, org, groups, owner_desc, created, modified,
-                     itemid, size, content_status, rating, num_views, md_score])
+                     itemid, size, content_status, rating, num_views, md_score, snippet, description])
         except Exception as e:
             print(item_desc)
             print('something went wrong')
@@ -237,7 +243,8 @@ def set_up_dict_lists():
     return {
         'FEATURE_SERVICES': [
             ['ITEM_TYPE', 'ITEM_NAME', 'FOLDER', 'SHARED', 'EVERYONE', 'ORG', 'GROUPS', 'OWNER', 'CREATEDATE', 'MODATE',
-             'ITEM_ID', 'ISVIEW', 'SOURCE_ITEM_ID', 'SOURCE_ITEM_NAME', 'SIZE', 'CONTENT_STATUS', 'DATE_EDITED', 'RATING', 'NUM_VIEWS', 'MD_SCORE']],
+             'ITEM_ID', 'ISVIEW', 'SOURCE_ITEM_ID', 'SOURCE_ITEM_NAME', 'SIZE', 'CONTENT_STATUS', 'DATE_EDITED', 'RATING',
+             'NUM_VIEWS', 'MD_SCORE', 'SUMMARY', 'DESCRIPTION']],
         'GROUP_MEMBERSHIP': [
             ['GROUP_NAME', 'MEMBER', 'MEMBERTYPE']],
         'GROUPS': [
@@ -246,13 +253,13 @@ def set_up_dict_lists():
             ['WEBMAP_TITLE', 'WEBMAP_ID', 'LAYER_NAME', 'EDITABLE', 'LAYER_FILTER', 'LAYER_ITEM_ID', 'LAYER_URL']],
         'WEB_APPS': [
             ['ITEM_TYPE', 'ITEM_NAME', 'FOLDER', 'SHARED', 'EVERYONE', 'ORG', 'GROUPS', 'OWNER', 'CREATEDATE', 'MODATE',
-             'ITEM_ID', 'WEBMAP_ID', 'SIZE', 'CONTENT_STATUS', 'RATING', 'NUM_VIEWS', 'MD_SCORE']],
+             'ITEM_ID', 'WEBMAP_ID', 'SIZE', 'CONTENT_STATUS', 'RATING', 'NUM_VIEWS', 'MD_SCORE', 'SUMMARY', 'DESCRIPTION']],
         'WEB_MAPS': [
             ['ITEM_TYPE', 'ITEM_NAME', 'FOLDER', 'SHARED', 'EVERYONE', 'ORG', 'GROUPS', 'OWNER', 'CREATEDATE', 'MODATE',
-             'ITEM_ID', 'SIZE', 'CONTENT_STATUS', 'RATING', 'NUM_VIEWS', 'MD_SCORE']],
+             'ITEM_ID', 'SIZE', 'CONTENT_STATUS', 'RATING', 'NUM_VIEWS', 'MD_SCORE', 'SUMMARY', 'DESCRIPTION']],
         'OTHER_ITEMS': [
             ['ITEM_TYPE', 'ITEM_NAME', 'FOLDER', 'SHARED', 'EVERYONE', 'ORG', 'GROUPS', 'OWNER', 'CREATEDATE', 'MODATE',
-             'ITEM_ID', 'SIZE', 'CONTENT_STATUS', 'RATING', 'NUM_VIEWS', 'MD_SCORE']],
+             'ITEM_ID', 'SIZE', 'CONTENT_STATUS', 'RATING', 'NUM_VIEWS', 'MD_SCORE', 'SUMMARY', 'DESCRIPTION']],
         'SHARING': [
             ['ITEM_ID', 'GROUP_NAME']],
         'USERS': [
@@ -429,7 +436,9 @@ def output_to_sqlite(dict_lists, sqlite_path):
                CONTENT_STATUS,
                RATING,
                NUM_VIEWS,
-               MD_SCORE
+               MD_SCORE,
+               SUMMARY,
+               DESCRIPTION
           FROM FEATURE_SERVICES
         UNION ALL
         SELECT ITEM_TYPE,
@@ -447,7 +456,9 @@ def output_to_sqlite(dict_lists, sqlite_path):
                CONTENT_STATUS,
                RATING,
                NUM_VIEWS,
-               MD_SCORE
+               MD_SCORE,
+               SUMMARY,
+               DESCRIPTION
           FROM WEB_MAPS
         UNION ALL
         SELECT ITEM_TYPE,
@@ -465,7 +476,9 @@ def output_to_sqlite(dict_lists, sqlite_path):
                CONTENT_STATUS,
                RATING,
                NUM_VIEWS,
-               MD_SCORE
+               MD_SCORE,
+               SUMMARY,
+               DESCRIPTION
           FROM WEB_APPS
         UNION ALL
         SELECT ITEM_TYPE,
@@ -483,7 +496,9 @@ def output_to_sqlite(dict_lists, sqlite_path):
                CONTENT_STATUS,
                RATING,
                NUM_VIEWS,
-               MD_SCORE
+               MD_SCORE,
+               SUMMARY,
+               DESCRIPTION
           FROM OTHER_ITEMS;
     """
         ,
